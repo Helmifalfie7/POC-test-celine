@@ -1,0 +1,223 @@
+{
+	"$schema": "http://json-schema.org/draft-06/schema#",
+	"$ref": "#/definitions/Welcome8",
+	"definitions": {
+		"Welcome8": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"globalSalesOrderId": {
+					"type": "string"
+				},
+				"orderNumber": {
+					"type": "string"
+				},
+				"orderTotalGross": {
+					"type": "number"
+				},
+				"orderTotalNet": {
+					"type": "number"
+				},
+				"orderTotalTax": {
+					"type": "number"
+				},
+				"orderTotalShipping": {
+					"type": "number"
+				},
+				"orderCurrency": {
+					"type": "string"
+				},
+				"orderStatus": {
+					"type": "string",
+					"enum": [
+						"Draft",
+						"Activated"
+					]
+				},
+				"orderProducts": {
+					"type": "array",
+					"items": {
+						"$ref": "#/definitions/OrderProduct"
+					}
+				},
+				"customerId": {
+					"type": "string"
+				},
+				"customerNumber": {
+					"type": "string"
+				},
+				"customerName": {
+					"type": "string",
+					"minLength": 1
+				},
+				"customerFirstName": {
+					"type": "string",
+					"minLength": 1
+				},
+				"customerLastName": {
+					"type": "string",
+					"minLength": 1
+				},
+				"emailAddress": {
+					"type": "string",
+					"minLength": 1
+				},
+				"businessPhone": {
+					"type": "string",
+					"minLength": 1
+				},
+				"billingAddress1": {
+					"type": "string",
+					"minLength": 1
+				},
+				"billingAddress2": {
+					"type": "string"
+				},
+				"billingCity": {
+					"type": "string",
+					"minLength": 1
+				},
+				"billingRegion": {
+					"type": "string",
+					"minLength": 1
+				},
+				"billingCountry": {
+					"type": "string",
+					"minLength": 1
+				},
+				"billingPostalCode": {
+					"type": "string",
+
+					"minLength": 1
+				},
+				"billingContactPhone": {
+					"type": "string",
+					"minLength": 1
+				},
+				"shippingAddress1": {
+					"type": "string",
+					"minLength": 1
+				},
+				"shippingAddress2": {
+					"type": "string"
+				},
+				"shippingCity": {
+					"type": "string",
+					"minLength": 1
+				},
+				"shippingRegion": {
+					"type": "string",
+					"minLength": 1
+				},
+				"shippingCountry": {
+					"type": "string",
+					"minLength": 1
+				},
+				"shippingPostalCode": {
+					"type": "string",
+
+					"minLength": 1
+				},
+				"shippingContactPhone": {
+					"type": "string",
+					"minLength": 1
+				},
+				"customerListId": {
+					"type": "string"
+				},
+				"siteId": {
+					"type": "string"
+				},
+				"createdBy": {
+					"type": "string"
+				},
+				"createdDate": {
+					"type": "string"
+				},
+				"updatedBy": {
+					"type": "string"
+				},
+				"updatedDate": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"orderNumber",
+				"orderTotalGross",
+				"orderStatus",
+				"orderProducts",
+				"customerName",
+				"customerFirstName",
+				"customerLastName",
+				"emailAddress",
+				"billingAddress1",
+				"billingAddress2",
+				"billingCity",
+				"billingRegion",
+				"billingCountry",
+				"billingPostalCode",
+				"shippingAddress1",
+				"shippingAddress2",
+				"shippingCity",
+				"shippingRegion",
+				"shippingCountry",
+				"shippingPostalCode",
+				"createdDate"
+			],
+			"title": "Welcome8"
+		},
+		"OrderProduct": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"adjustedGrossPrice": {
+					"type": "number"
+				},
+				"adjustedNetPrice": {
+					"type": "number"
+				},
+				"adjustedPrice": {
+					"type": "number",
+					"minLength": 1
+				},
+				"adjustedTax": {
+					"type": "number"
+				},
+				"isBonusProduct": {
+					"type": "boolean"
+				},
+				"isBundledProduct": {
+					"type": "boolean"
+				},
+				"isGift": {
+					"type": "boolean"
+				},
+				"positionIndex": {
+					"type": "integer"
+				},
+				"productId": {
+					"type": "string",
+					"minLength": 1
+				},
+				"productName": {
+					"type": "string",
+					"minLength": 1
+				},
+				"quantityUnit": {
+					"type": "string"
+				},
+				"quantityValue": {
+					"type": "integer",
+					"minLength": 1
+				}
+			},
+			"required": [
+				"adjustedPrice",
+				"productId",
+				"productName",
+				"quantityValue"
+			],
+			"title": "OrderProduct"
+		}
+	}
+}

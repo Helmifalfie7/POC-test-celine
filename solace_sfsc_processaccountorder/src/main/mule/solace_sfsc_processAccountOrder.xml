@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:solace="http://www.mulesoft.org/schema/mule/solace"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/solace http://www.mulesoft.org/schema/mule/solace/current/mule-solace.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="4a039318-f409-4e02-80fc-c176a98b6f29" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<solace:config name="Solace_PubSub__Connector_Config" doc:name="Solace PubSub+ Connector Config" doc:id="3dd1520a-4ee4-4bb7-bfdb-28c706cc0615" >
+		<solace:connection clientUserName="solace-cloud-client" password="jce68m8pukhbvkg7egbqn90iv" msgVPN="solace-mulesoft" brokerHost="tcps://mrigmc9mr3ax9.messaging.solace.cloud:55443" />
+	</solace:config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="e708dc35-3e07-4d5c-b0b1-e169a17a62ad" >
+		<salesforce:basic-connection username="helmi.el-arem@talan.com.mulesoftsb" password="Helmi2020" securityToken="RdJSSbhtf4JeAzQ9VR5jOp7Ap" url="https://test.salesforce.com/services/Soap/u/28.0/" />
+	</salesforce:sfdc-config>
+	<http:request-config name="HTTP_Request_create_account" doc:name="HTTP Request configuration" doc:id="19263371-0355-49ce-bab1-7ae29b0e49ea" >
+		<http:request-connection host="sfsc-api-postaccount.us-e2.cloudhub.io" />
+	</http:request-config>
+	<http:request-config name="HTTP_Request_configuration_SFMC_sendEmail" doc:name="HTTP Request configuration" doc:id="40a96ce9-18f1-4ffc-bf2f-50e5ec607628" >
+		<http:request-connection host="mule-sfmc-sendemail-app.us-e2.cloudhub.io" />
+	</http:request-config>
+	
+	<http:request-config name="HTTP_Request_configuration_create_order" doc:name="HTTP Request configuration" doc:id="ab5ab483-5aca-4faf-96f9-32e5f09d5fa7" >
+		<http:request-connection host="sfsc-api-postorder.us-e2.cloudhub.io" />
+	</http:request-config>
+	<flow name="solace_sfsc_processaccountorderFlow" doc:id="d1a2258a-8133-4a93-bc81-cf4ceb10c881" >
+		<http:listener doc:name="/sfcc/order" doc:id="2801572d-4dd9-4260-87da-fed291c5d9de" config-ref="HTTP_Listener_config" path="/sfcc/order"/>
+		<json:validate-schema doc:name="Validate schema" doc:id="5c4a3b3e-8927-45bb-8aff-a0bd24a2891e" schema="schemas/secure.json">
+			<error-mapping sourceType="JSON:INVALID_INPUT_JSON" targetType="APP::INVALID_INPUT" />
+			<error-mapping targetType="APP:VALIDATION_ERROR" />
+		</json:validate-schema>
+		<solace:publish address="celine-mule" doc:name="Publish" doc:id="5edc04ad-603d-403a-b084-3c79b78a49c5" config-ref="Solace_PubSub__Connector_Config" destination-type="QUEUE"/>
+		<ee:transform doc:name="Transform Message" doc:id="db7130cf-e180-4dc0-974e-9fa60d020c76" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": "202",
+	"message": "Accepted",
+	"correlationId": correlationId
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="69dcdc49-0bcc-4e85-a500-aa8b2b7a3cd3" type="JSON:SCHEMA_NOT_HONOURED">
+				<set-variable value="#[400]" doc:name="httpStatus" doc:id="3884ef74-9c21-4e24-b1fb-dddb721d2c55" variableName="httpStatus"/>
+				<ee:transform doc:name="error message" doc:id="a99b4cd3-c99d-467f-9586-38f54cbe4549" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+error.muleMessage.typedValue
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="solace_sfsc_processAccountOrderFlow" doc:id="8dbc3d02-83f3-401a-8cb4-8e4aadbc7637" >
+		<http:listener doc:name="/sfsc/ordertest" doc:id="3233d74a-69d9-4a94-87f6-b4b3348b26e0" config-ref="HTTP_Listener_config" path="/sfsc/ordertest"/>
+		<flow-ref doc:name="Flow Reference" doc:id="c6dd0fb6-5e1d-40b0-ac07-6b68c1b3b062" name="solace_sfsc_processaccountorderFlow1"/>
+	</flow>
+	<flow name="solace_sfsc_processaccountorderFlow1" doc:id="f36789a7-704d-40f1-b8f7-1900301ac259" >
+		<solace:queue-listener doc:name="Guaranteed Endpoint Listener" doc:id="a6d5bfb7-2dba-42c0-9a42-3e9b93760439" config-ref="Solace_PubSub__Connector_Config" address="celine-mule"/>
+		<set-variable value="#[payload]" doc:name="orderPayload" doc:id="8c93128b-0465-4b47-8e59-328e72701979" variableName="orderPayload"/>
+		<set-variable value="#[vars.orderPayload.emailAddress]" doc:name="emailAddress" doc:id="4dfdabb0-1095-4ada-a4d8-79c0e340fc71" variableName="emailAddress"/>
+		<salesforce:query doc:name="selectcontactbyEmail" doc:id="8b0351e9-27fd-48a0-ba00-48f8737f6a30" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[select Name, Phone, AccountId, Id, mailingstreet  from contact where email = ':Email']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"Email" : vars.emailAddress
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="contactOutput" doc:id="2ac7d3da-42b0-4d58-9a51-ddf8e9d26f90" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contactoutput" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Does account exist ?" doc:id="1262146f-e1b6-43a1-a5da-3fdeabda7193" >
+			<when expression="#[vars.contactoutput != null and !isEmpty(vars.contactoutput)]">
+				<ee:transform doc:name="SetaccountId" doc:id="e46148e8-a76d-4818-8ec7-c1a5bfb6ba93" >
+					<ee:message >
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="AccountId" ><![CDATA[%dw 2.0
+output application/json
+---
+vars.contactoutput.AccountId]]></ee:set-variable>
+					</ee:variables>
+				
+</ee:transform>
+				<set-variable value="#[vars.AccountId reduce($$ + $)]" doc:name="existAccount" doc:id="12c9b777-202e-43e6-b62b-a1a5caa33edd" variableName="AccountId"/>
+				<logger level="INFO" doc:name="Logger" doc:id="3182bc01-c981-4f85-be1c-1ba201c9bd6e" message="#[&quot;existing Account Id:&quot; ++ ' ' ++ (vars.AccountId default '')]"/>
+				<http:request method="POST" doc:name="create-order" doc:id="c67902b2-7c79-4689-bdbb-607a5826fab0" config-ref="HTTP_Request_configuration_create_order" path="/sfsc/order">
+					<http:body ><![CDATA[#[vars.orderPayload]]]></http:body>
+					<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"AccountId" : vars.AccountId
+}]]]></http:query-params>
+				</http:request>
+				<set-variable value="#[payload.orderId]" doc:name="orderId" doc:id="263f7631-1c22-4800-804c-e7d5dc3fe335" variableName="orderId"/>
+				<ee:transform doc:name="order-output" doc:id="e80da60a-8943-4aeb-9fcf-c0705dddfc3b" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Order created successfully!",
+	"orderId": payload.orderId,
+	"CustomerName": vars.orderPayload.customerName,
+	"emailAddress": vars.orderPayload.emailAddress,	
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="91bc10f2-5ca8-4e0d-8584-8586182248b0" message="#[payload]"/>
+			
+</when>
+			<otherwise >
+				<ee:transform doc:name="prepare data" doc:id="6ff50fd2-b1df-428e-9db8-584a2febd715">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.orderPayload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<http:request method="POST" doc:name="CreateAccount" doc:id="6d71e732-5de1-4110-8a5b-904ed85487c1" config-ref="HTTP_Request_create_account" path="/sfsc/account"/>
+				<set-variable value="#[payload.AccountId]" doc:name="AccountId" doc:id="c445a42f-558a-4e60-99d5-1a06fe85e64b" variableName="AccountId"/>
+				<logger level="INFO" doc:name="Logger" doc:id="45fa39e9-5244-41e9-ba71-759c178ddaae" message="#[&quot;Account Id:&quot; ++ ' ' ++ (vars.AccountId default '')]"/>
+				<ee:transform doc:name="prepare data" doc:id="c2bba96a-858e-4e7b-bdd7-e65a439baf9f">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.orderPayload
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<http:request method="POST" doc:name="create-order" doc:id="a3c69839-a83a-42fa-9945-ced1630bc287" config-ref="HTTP_Request_configuration_create_order" path="/sfsc/order">
+					<http:body ><![CDATA[#[vars.orderPayload]]]></http:body>
+					<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"AccountId" : vars.AccountId
+}]]]></http:query-params>
+				</http:request>
+				<ee:transform doc:name="Transform Message" doc:id="d8b23ea7-51a1-4eda-9d7d-14e0250c31f1" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Order created successfully!",
+	"CustomerName": vars.orderPayload.customerName,
+	"emailAddress": vars.orderPayload.emailAddress,
+	
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="35f2fa9a-acc9-45ac-b0d8-96a364eaf1ef" message="#[payload]"/>
+			
+
+
+</otherwise>
+		</choice>
+		<http:request method="POST" doc:name="SFMC_sendEmail" doc:id="9c1c1ce7-b92c-48b3-9d6a-15ff4193b46a" config-ref="HTTP_Request_configuration_SFMC_sendEmail" path="/sfmc/sendEmail"/>
+		<ee:transform doc:name="Transform Message" doc:id="8eb1e7e7-b7d2-4a87-8a4f-80df5ba0c51e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+<!-- [STUDIO:"solace_sfsc_processAccountOrderFlow1"]	<flow name="solace_sfsc_processAccountOrderFlow1" doc:id="236f9faa-50aa-404b-b997-8c4c42474ba6">
+		<http:listener doc:name="/order/create/test" doc:id="8f179068-0775-4d5d-90c4-06aac52b183d" config-ref="HTTP_Listener_config" path="/order/create/test" />
+		<json:validate-schema doc:name="Validate schema" doc:id="6e7cd799-bc6a-4664-ab94-d57b835f5568" schema="schemas/request.json" dereferencing="INLINE"/>
+		<ee:transform doc:name="Transform Message" doc:id="c72ea3cd-0e89-45d3-9010-b14eb31604ee">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+&#45;&#45;-
+{
+	"message": "success!"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="3372a2ec-ac85-474d-b343-416b04209567" message="#[payload]" />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="598391b7-e5fa-4e33-b24e-64a56cece7e8" >
+				<logger level="INFO" doc:name="Logger" doc:id="ebe4c21a-1b4a-4257-8caf-14dddc3eece5" message="#[payload]"/>
+				<ee:transform doc:name="Transform Message" doc:id="68423c18-6117-4659-8017-77bfe3f39056" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+&#45;&#45;-
+error.muleMessage.payload filter($.level == "error") map {
+    "Error $$": {
+        element: $.instance.pointer,
+        message: $.message
+    }
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-continue>
+		</error-handler>
+	</flow> [STUDIO] -->
+</mule>

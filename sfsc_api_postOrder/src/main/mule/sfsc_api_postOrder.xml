@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="91b0e1b8-342a-4b01-aeb0-1672b992c41c" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="24f94d00-3fc6-4cad-949e-ee3bd634a8bf" >
+		<salesforce:basic-connection username="helmi.el-arem@talan.com.mulesoftsb" password="Helmi2020" securityToken="RdJSSbhtf4JeAzQ9VR5jOp7Ap" url="https://test.salesforce.com/services/Soap/u/28.0/" />
+	</salesforce:sfdc-config>
+	<flow name="Create_order_SFSC" doc:id="60dad8fe-5b1a-4802-9a88-c9ba0ea64385" >
+		<http:listener doc:name="/sfsc/order" doc:id="b091e952-f44e-4854-b275-f3ca3f811b67" config-ref="HTTP_Listener_config" path="/sfsc/order" allowedMethods="POST">
+			<http:error-response statusCode="#[vars.httpStatus]" >
+				<http:body ><![CDATA[#[output application/json --- payload]]]></http:body>
+			</http:error-response>
+		</http:listener>
+		<set-variable value="#[attributes.queryParams.accountId]" doc:name="accountId" doc:id="993d83e9-a335-4c55-bf47-4f7a5a64d124" variableName="accountId"/>
+		<set-variable value="#[payload]" doc:name="payload" doc:id="5517968f-bf63-44a4-a79a-f126db98c904" variableName="mainpayload"/>
+		<salesforce:query doc:name="selectPriceBookId" doc:id="8129fbf1-918f-414d-be05-5a745a186e54" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[select Id from Pricebook2 where Name = 'Standard Price Book' limit 200]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="c7b9a318-8127-4b2e-a5e1-0cd1593bb613" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="6a87e154-ca9c-4e23-9753-619e3e0e2f36" >
+			<when expression="#[sizeOf(payload) == 0]">
+				<validation:is-true doc:name="Is true" doc:id="da4faf88-0746-4506-80a8-59cb020d9c49" expression="#[payload.successful]" message='#["Error select priceBookId "]'>
+					<error-mapping targetType="APP:ERROR_SELECT_PRICEBOOKID" />
+				</validation:is-true>
+			</when>
+			<otherwise >
+				<set-variable value="#[payload.Id reduce ($$ ++ $)]" doc:name="priceBookId" doc:id="5e8b6841-1b73-460e-8857-f2b01779a7f7" variableName="priceBookId" />
+				<ee:transform doc:name="prepareOrderdata" doc:id="297e05f0-31ff-49e9-aa30-188f7146620c">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	AccountId: vars.accountId,
+	EffectiveDate: now() as Date {
+		format :"yyyy-MM-dd"
+	},
+	Pricebook2Id: vars.priceBookId,
+	Status: vars.mainpayload.orderStatus,
+	BillingStreet: (vars.mainpayload.billingAddress1 default "") ++ ', ' ++(vars.payloadOrder.billingAddress2 default ""),
+	BillingCity: vars.mainpayload.billingCity,
+	BillingState: vars.mainpayload.billingRegion,
+	BillingPostalCode: vars.mainpayload.billingPostalCode,
+	BillingCountry: vars.mainpayload.billingCountry,
+	ShippingStreet: (vars.mainpayload.shippingAddress1 default "")++ ', ' ++(vars.payloadOrder.shippingAddress2 default ""),
+	ShippingCity: vars.mainpayload.shippingCity,
+	ShippingState: vars.mainpayload.shippingRegion,
+	ShippingPostalCode: vars.mainpayload.shippingPostalCode,
+	ShippingCountry: vars.mainpayload.shippingCountry
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				<salesforce:create type="Order" doc:name="Create_order_SFSC" doc:id="06e75d33-c7f9-4e79-915e-80bfa35f71d0" config-ref="Salesforce_Config" />
+				<choice doc:name="Choice" doc:id="9839ae06-a79b-42a9-a005-03354753f440">
+					<when expression="#[payload.successful == false]">
+						<validation:is-true doc:name="Is true" doc:id="60c56456-9818-4dcf-8c53-1b1e0fb7b0eb" expression="#[payload.successful]" message='#["Error creation order"]'>
+							<error-mapping targetType="APP:ERROR_CREATION_ORDER" />
+						</validation:is-true>
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="Logger" doc:id="42c7d7dd-1839-4fec-a37b-ced4f8f704dd" message="#[payload]" />
+						<set-variable value="#[payload.items[0].id as String]" doc:name="Set orderId" doc:id="320ba931-2065-434f-b812-e441386c0154" variableName="orderId" />
+						<flow-ref doc:name="mapOrderItem" doc:id="e00c27dd-5b65-48aa-b9ec-d1eed73fbc4e" name="addOrderItem" />
+<ee:transform doc:name="Transform Message" doc:id="136724d2-e4d1-43d4-b284-bc1fdf57c627">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": "202",
+	"message": "Accepted: Order created in SFSC",
+	"orderId": vars.orderId
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+					</otherwise>
+				</choice>
+			</otherwise>
+		</choice>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="Copy_of_On Error Propagate" doc:id="c4e87312-d536-46c8-9564-ad7011a8d393" type="APP:ERROR_SELECT_PRICEBOOKID" >
+				<set-variable value="#[403]" doc:name="httpStatus" doc:id="f33a5bfb-64ae-47fc-b1cb-5fbc3e18f77a" variableName="httpStatus" />
+				<ee:transform doc:name="MessageError" doc:id="3da07482-9651-4146-8e20-b32aa7a3e584" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": vars.httpStatus,
+	"message": error.description
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="ee514f03-bce6-4ce1-8c84-ab0425431e11" message="#[payload]"/>
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="c9bac8f4-7cce-4e86-b2e1-45e8d95adb35" type="APP:ERROR_CREATION_ORDER">
+				<set-variable value="#[409]" doc:name="httpStatus" doc:id="ebb28509-6f5f-43b5-a25c-952f27206bb9" variableName="httpStatus" />
+				<ee:transform doc:name="MessageError" doc:id="5dbf168c-7cae-4d3c-bf67-a5ce6b398859" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": vars.httpStatus,
+	"message": error.description
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="087dab5b-248d-4bc6-bbad-ff2e020ec399" message="#[payload]" />
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="addOrderItem" doc:id="da5ce3a5-2b6b-47f9-9c39-49a0b77340ee" >
+		<foreach doc:name="For Each product" doc:id="01719c7e-a2f9-4600-bef2-ed69f64f19a8" collection="#[vars.mainpayload.orderProducts]">
+			<set-variable value="#[payload]" doc:name="productItem" doc:id="a096f781-6e54-44be-ab4c-af07a03c38cd" variableName="ProductItem"/>
+			<logger level="INFO" doc:name="productItem" doc:id="5984ab6c-d673-408f-9df3-51d0baf7e37c" message="#[vars.ProductItem]"/>
+			<salesforce:query doc:name="selectProduct-Code" doc:id="e36782e4-bbfc-47ee-926a-5c3c02520a34" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query ><![CDATA[select ProductCode from Product2 where Name= ':name']]></salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+		"name" : payload.productName as String
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<choice doc:name="Choice" doc:id="353a2523-a856-4b86-b177-25a20aa932de" >
+				<when expression="#[sizeOf(payload)==0]">
+					<set-variable value="#[vars.ProductItem.productName]" doc:name="Set Variable" doc:id="7f30bdce-4a5c-4493-8499-c32161266e13" variableName="productName"/>
+					<validation:is-true doc:name="Is true" doc:id="e66c7d5b-3f04-4d93-a49e-bf911e555588" expression="#[payload.successful]" message='#["Product code not found is priceBook for product: " ++ vars.ProductItem.productName]'>
+						<error-mapping targetType="APP:ERROR_SELECT_PRODUCT_CODE" />
+					</validation:is-true>
+				</when>
+				<otherwise >
+					<ee:transform doc:name="Setvariable productCode" doc:id="cb50ab96-4202-418c-9f3c-4eb839ec7bda">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+					<ee:set-variable variableName="productCode"><![CDATA[%dw 2.0
+output application/json
+---
+payload.ProductCode reduce ($$+$ ) as String]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+					<salesforce:query doc:name="selectPricebook-EntryId" doc:id="f0f5e3a8-b9bd-4899-a285-33e233acdec8" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query><![CDATA[select id from PricebookEntry where Pricebook2.Name ='Standard Price Book' and ProductCode= ':productCode' ]]></salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"productCode" : vars.productCode as String
+}]]]></salesforce:parameters>
+			</salesforce:query>
+					<set-variable value="#[payload.Id reduce($$+$)]" doc:name="pricebookentryId" doc:id="b608e12a-cb22-4a89-b73e-f436d0a7d0ab" variableName="pricebookentryId" />
+					<ee:transform doc:name="prepareOrderItem" doc:id="7f50aab3-e138-462a-b016-1412865a15fe">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	OrderId: vars.orderId ,
+    PricebookEntryId: vars.pricebookentryId,
+    UnitPrice:vars.ProductItem.adjustedPrice,
+    Quantity: vars.ProductItem.quantityValue 
+}]
+	
+]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+					<salesforce:create type="OrderItem" doc:name="AddOrderItem" doc:id="de22857d-ed3a-4840-b074-bb6a1da49e51" config-ref="Salesforce_Config" />
+					<choice doc:name="Choice" doc:id="c5f58a9b-86f6-4a88-affd-4489125da9ef" >
+						<when expression="#[payload.successful == false]">
+							<validation:is-true doc:name="Is true" doc:id="743ab68e-86b3-43f2-8f3e-ce4628131c08" expression="#[payload.successful]" message='#["Failure add Item to order"]'>
+								<error-mapping targetType="APP:ERROR_ADD_ITEMS_ORDER" />
+							</validation:is-true>
+						</when>
+						<otherwise >
+							<logger level="INFO" doc:name="Logger" doc:id="7ef21b4d-f60f-4ed9-aa3c-6fe9a3071849" message='#["Success Add Product " ++ vars.ProductItem.productName as String ++&#10; " to order"]' />
+						</otherwise>
+					</choice>
+				</otherwise>
+			</choice>
+		</foreach>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="80dbdc3c-2f78-4d5b-a3b6-cc3ff539cb2c" type="APP:ERROR_SELECT_PRODUCT_CODE">
+				<set-variable value="#[409]" doc:name="httpStatus" doc:id="f08c20a8-4960-48cf-b304-59a1f6275ce1" variableName="httpStatus" />
+				<ee:transform doc:name="MessageError" doc:id="18a23228-1504-4850-9e34-e59755b13203">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": vars.httpStatus,
+	"message": error.description
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="fb950995-9b8a-4dc0-b615-b39e30e56b09" type="APP:ERROR_ADD_ITEMS_ORDER">
+				<set-variable value="#[409]" doc:name="Copy_of_httpStatus" doc:id="e8bb072a-bc84-41ef-94db-29ad502da83f" variableName="httpStatus" />
+				<ee:transform doc:name="Copy_of_MessageError" doc:id="7d7ec67b-add9-4577-acc1-a900e7459aa2" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": vars.httpStatus,
+	"message": error.description
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>

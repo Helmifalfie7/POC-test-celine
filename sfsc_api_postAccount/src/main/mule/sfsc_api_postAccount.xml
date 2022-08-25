@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:xml-module="http://www.mulesoft.org/schema/mule/xml-module"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/xml-module http://www.mulesoft.org/schema/mule/xml-module/current/mule-xml-module.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="27ab851f-82a0-4420-a76e-c31eadbd3590" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="273f1540-56ba-4633-bd8e-c87e4cce1b75" >
+		<salesforce:basic-connection username="helmi.el-arem@talan.com.mulesoftsb" password="Helmi2020" securityToken="RdJSSbhtf4JeAzQ9VR5jOp7Ap" url="https://test.salesforce.com/services/Soap/u/28.0/" />
+	</salesforce:sfdc-config>
+	<flow name="Get_AccountbyId" doc:id="113db5ae-29f2-41ff-9827-cf69d7f1def7" >
+		<http:listener doc:name="/sfsc/account/{ID}" doc:id="efc50165-79a6-441f-8283-70303626400a" config-ref="HTTP_Listener_config" path="/sfsc/account/{ID}"/>
+		<ee:transform doc:name="set accountId" doc:id="d4a88034-7a83-4a75-89ed-3e272c89e2f3" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="AccountId" ><![CDATA[%dw 2.0
+output application/java
+---
+attributes.uriParams.ID]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce:query doc:name="selectAccountbyId" doc:id="7e2cdf26-4d4f-4487-81af-05a2ab8c5f6b" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[select id, name, Phone,  ShippingStreet, billingstreet, createdDate from Account where id =':Id']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"Id" : vars.AccountId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="output" doc:id="04c2fa1d-40ec-41be-b364-5c96af784191" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="4cbcab1c-e504-454c-8430-5e96bce9731b" type="SALESFORCE:CONNECTIVITY, SALESFORCE:INVALID_INPUT, SALESFORCE:INVALID_RESPONSE, SALESFORCE:LIMIT_EXCEEDED, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED, SALESFORCE:NOT_FOUND, SALESFORCE:TIMEOUT">
+				<set-variable value="500" doc:name="httpStatus" doc:id="01e912fc-9524-47b5-b0ab-2f2bf0d1c0e2" variableName="httpStatus"/>
+				<set-variable value="#[error.description]" doc:name="error message" doc:id="73d6e83b-ac87-45e9-901e-8157c54dc139" variableName="error message" />
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="f0306f38-b6c1-4379-a3e8-d6904ce606cb" type="EXPRESSION, STREAM_MAXIMUM_SIZE_EXCEEDED">
+				<set-variable value="400" doc:name="httpStatus" doc:id="e2bcf126-e15e-472f-86cc-074991bfc129" variableName="httpStatus"/>
+				<set-variable value="#[error.description]" doc:name="error message" doc:id="ff89e062-04c2-4e5f-8e92-0f07d34ee066" variableName="error message"/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="Create_Account_SFSC" doc:id="e53868f4-a631-47f1-8f3e-aabc2b9ec7d0" >
+		<http:listener doc:name="/sfsc/account" doc:id="bf2d932b-67cf-48ca-abad-28725161734b" config-ref="HTTP_Listener_config" path="/sfsc/account">
+			<http:error-response statusCode="#[vars.httpStatus]">
+				<http:body ><![CDATA[#[output application/json --- payload]]]></http:body>
+			</http:error-response>
+		</http:listener>
+		<set-variable value="#[payload]" doc:name="mainpayload" doc:id="bed1cdd1-0c0e-4c6f-8729-8ab7a3f9df71" variableName="mainpayload"/>
+		<ee:transform doc:name="prepareData" doc:id="447dd8c3-a750-48ba-bd09-e9952c98abe1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Name: vars.mainpayload.customerName,
+	BillingStreet: (vars.mainpayload.billingAddress1 default "") ++ ',' ++ (vars.mainpayload.billingAddress2 default ""),
+	BillingCity: vars.mainpayload.billingCity,
+	BillingState: vars.mainpayload.billingRegion,
+	BillingPostalCode: vars.mainpayload.billingPostalCode,
+	BillingCountry: vars.mainpayload.billingCountry,
+	ShippingStreet: (vars.mainpayload.shippingAddress1 default "" ) ++ ',' ++ (vars.mainpayload.shippingAddress2  default ""),
+	ShippingCity: vars.mainpayload.shippingCity,
+	ShippingState: vars.mainpayload.shippingRegion,
+	ShippingPostalCode: vars.mainpayload.shippingPostalCode,
+	ShippingCountry: vars.mainpayload.shippingCountry,
+	Phone: vars.mainpayload.shippingContactPhone
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="Create_Account" doc:id="f017d31d-b4f8-48c7-abbf-c78c8bd9f55c" config-ref="Salesforce_Config" type="Account"/>
+		<choice doc:name="Choice" doc:id="02fda4e6-72db-4aab-8d24-05f6068a9124" >
+			<when expression="#[payload.successful == false]">
+				<set-variable value="#[payload.items.message reduce ($$ ++ $)]" doc:name="errorCreationAccount" doc:id="cff757c1-05e8-4244-9b02-5f16bb9c480d" variableName="errorCreationAccount" />
+				<validation:is-true doc:name="Is true" doc:id="b51fb03c-cc17-4227-a63e-3f2e5b3495c4" expression="#[payload.successful]" message='#["Error creation account: " ++ vars.mainpayload.customerName]'>
+					<error-mapping targetType="APP:ERROR_CREATE_ACCOUNT" />
+				</validation:is-true>
+			</when>
+			<otherwise >
+				<set-variable value="#[payload.items[0].id as String]" doc:name="SFSCaccountId" doc:id="222a9d82-aea2-4b4d-9c9b-ebe8ead013da" variableName="SFSCaccountId" />
+				<ee:transform doc:name="Transform Message" doc:id="161690f3-63c9-4726-9e51-df31567f5a5a">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="6f8da44f-a10a-4abd-9976-1e4a8416f579" message="#[payload]" />
+				<flow-ref doc:name="Create_Contact_SFSC" doc:id="32222e47-24bf-4aac-96d9-1d2f27166881" name="Create_Contact_SFSC" />
+			</otherwise>
+		</choice>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="34d9f9ae-3d1d-40b1-b633-617decd0d27d" type="SALESFORCE:CONNECTIVITY, SALESFORCE:INVALID_INPUT, SALESFORCE:INVALID_RESPONSE, SALESFORCE:LIMIT_EXCEEDED, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED, SALESFORCE:NOT_FOUND, SALESFORCE:TIMEOUT" >
+				<set-variable value="500" doc:name="httpStatus" doc:id="76ed632c-2a97-4ed4-bcaa-6601984f0bfe" variableName="httpStatus" />
+				<ee:transform doc:name="Error Message" doc:id="c9bfe6d5-c43d-4531-87f8-4503d3294b73" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": vars.httpStatus,
+	"message": error.description
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="d51a394d-623c-4df5-b118-ca9b88ed9925" type="EXPRESSION, STREAM_MAXIMUM_SIZE_EXCEEDED" >
+				<set-variable value="400" doc:name="httpStatus" doc:id="f945d1a3-fcef-42d0-b907-e3566261e80a" variableName="httpStatus" />
+				<ee:transform doc:name="Error Message" doc:id="5510d8f7-d7c7-4637-a98b-8db2e1863a5e" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": vars.httpStatus,
+	"message": error.description
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="cba06a52-52b0-4146-8127-3827b5d1ca8f" type="APP:ERROR_CREATE_ACCOUNT">
+				<set-variable value="#[409]" doc:name="Set Variable" doc:id="3bb7e404-dd80-4eb2-924a-d45e6b0ed5c9" variableName="httpStatus"/>
+				<ee:transform doc:name="Error Message" doc:id="d301501c-67ba-436a-b37e-44dc5ab1380b" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": vars.httpStatus,
+	"message": vars.errorCreationAccount as String ++ ("Error creation account: " ++ vars.mainpayload.customerName as String)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="Create_Contact_SFSC" doc:id="2af4f5c3-b267-44d1-82d2-909f6714054b" >
+		<ee:transform doc:name="Transform Message" doc:id="11513abf-c623-41ab-8efc-ec298b7c15e7">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{	
+	AccountId: vars.SFSCaccountId,
+	LastName: vars.mainpayload.customerLastName,
+	FirstName: vars.mainpayload.customerFirstName,
+	Phone: vars.mainpayload.businessPhone,
+	MobilePhone: vars.mainpayload.billingContactPhone,
+	Email: vars.mainpayload.emailAddress,
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create type="Contact" doc:name="Create_Contact" doc:id="963faeab-6e45-4925-9f1e-9abb537b9824" config-ref="Salesforce_Config"/>
+		<choice doc:name="Choice" doc:id="8ec94d65-0ba6-4714-86aa-8b20f35dd882" >
+			<when expression="#[payload.successful == false]">
+				<set-variable value="#[payload.items.message reduce ($$ ++ $)]" doc:name="errorCreationAccount" doc:id="4f1d0965-98fc-42de-9e15-8c975499693b" variableName="errorCreationContact" />
+				<validation:is-true doc:name="Is true" doc:id="fdb18169-fac8-49a0-8b28-c35a9d2b965c" expression="#[payload.successful]" message='#["Error creation contact: " ++ vars.mainpayload.emailAddress]'>
+					<error-mapping targetType="APP:ERROR_CREATE_CONTACT" />
+				</validation:is-true>
+			</when>
+			<otherwise>
+				<ee:transform doc:name="output" doc:id="dad3d164-fc53-47b3-8e6d-47b2b3b221ca">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": "202",
+	"message": "Accepted",
+	"AccountId": vars.SFSCaccountId
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="940c5ffb-c5cb-49c4-8e10-08339d18df9d" message="#[payload]"/>
+
+			</otherwise>
+		
+</choice>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="76bafcac-5b22-4bbf-bbf9-a329223cb1a5" type="SALESFORCE:CONNECTIVITY, SALESFORCE:INVALID_INPUT, SALESFORCE:INVALID_RESPONSE, SALESFORCE:LIMIT_EXCEEDED, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED, SALESFORCE:NOT_FOUND, SALESFORCE:TIMEOUT" >
+				<set-variable value="500" doc:name="httpStatus" doc:id="03333ebe-b4c6-4e93-9a3c-cc06ec846b61" variableName="httpStatus" />
+				<ee:transform doc:name="Error Message" doc:id="91b38d30-fcf0-4681-88d7-13a279118938" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": vars.httpStatus,
+	"message": error.description
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="c5fbb51b-5dc9-41d9-a6a3-38dce109af5a" type="EXPRESSION, STREAM_MAXIMUM_SIZE_EXCEEDED" >
+				<set-variable value="400" doc:name="httpStatus" doc:id="39c68016-b124-4cf3-bdfc-688d1cfd4f08" variableName="httpStatus" />
+				<ee:transform doc:name="Error Message" doc:id="665f407c-992d-4b2f-8775-3e7f05a7502e" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": vars.httpStatus,
+	"message": error.description
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="Copy_of_On Error Propagate" doc:id="5a875751-0c48-4bc6-ac50-949993789099" type="APP:ERROR_CREATE_CONTACT" >
+				<set-variable value="#[409]" doc:name="Copy_of_Set Variable" doc:id="aeea7645-57e6-4840-8082-39f847bf4543" variableName="httpStatus" />
+				<ee:transform doc:name="Copy_of_Error Message" doc:id="f326515f-69bd-4e77-bc9f-1309e2cdb910" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"code": vars.httpStatus,
+	"message": vars.errorCreationContact as String ++ ("/ Error creation contact for this email: " ++ vars.mainpayload.emailAddress as String)
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>
