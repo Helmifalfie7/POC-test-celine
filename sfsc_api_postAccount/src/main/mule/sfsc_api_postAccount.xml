@@ -42,6 +42,7 @@ output application/json
 payload]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="2f852f1b-6511-4dc5-b575-fe67f54a6626" message="#[payload]"/>
 		<error-handler >
 			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="4cbcab1c-e504-454c-8430-5e96bce9731b" type="SALESFORCE:CONNECTIVITY, SALESFORCE:INVALID_INPUT, SALESFORCE:INVALID_RESPONSE, SALESFORCE:LIMIT_EXCEEDED, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED, SALESFORCE:NOT_FOUND, SALESFORCE:TIMEOUT">
 				<set-variable value="500" doc:name="httpStatus" doc:id="01e912fc-9524-47b5-b0ab-2f2bf0d1c0e2" variableName="httpStatus"/>
